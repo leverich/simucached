@@ -1,0 +1,8 @@
+*~
+*.[oda]
+.scon*
+config.log
+simucached
+cmdline.cc
+cmdline.h
+config.h
