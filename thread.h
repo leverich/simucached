@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#define READ_CHUNK 4096
+
 class Thread {
 public:
   pthread_t pt; // pthread handle
@@ -23,8 +25,7 @@ public:
 
   connection_state_enum state;
   int bytes_to_eat;
-  std::vector<char> buffer;
-  //  char buffer[READ_CHUNK+1];
+  char buffer[READ_CHUNK+1];
   int buffer_idx;
 
   Connection(int _fd) : fd(_fd), state(IDLE), bytes_to_eat(0), buffer_idx(0) {}

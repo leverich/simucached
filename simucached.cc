@@ -43,6 +43,7 @@
 using namespace std;
 
 gengetopt_args_info args;
+char *get_reply;
 
 static int open_listen_socket(int port) {
   struct sockaddr_in sa;
@@ -110,6 +111,12 @@ int main(int argc, char **argv) {
 
   V("%s v%s ready to roll",
     CMDLINE_PARSER_PACKAGE_NAME, CMDLINE_PARSER_VERSION);
+
+  // Construct a GET reply.
+  get_reply = (char *) malloc(2*1024*1024);
+  sprintf(get_reply, "VALUE xyz 0 %d\r\n", args.value_size_arg);
+  strcpy(&get_reply[strlen(get_reply)] + args.value_size_arg, "\r\nEND\r\n");
+  memset(get_reply + strlen(get_reply), 'f', args.value_size_arg);
 
   Thread td[args.threads_arg];
 
