@@ -15,7 +15,7 @@ if not conf.CheckCXX():
     print "A compiler with C++11 support is required."
     Exit(1)
 
-print "Checking for gengetopt... ",
+print "Checking for gengetopt...",
 if env.Execute("@which gengetopt &> /dev/null"):
     print "not found (required)"
     Exit(1)
