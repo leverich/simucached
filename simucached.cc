@@ -68,6 +68,39 @@ static int open_listen_socket(int port) {
   return fd;
 }
 
+void spawn_thread(Thread* td) {
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+
+  if (args.affinity_given) {
+    static int current_cpu = -1;
+    int max_cpus = 8 * sizeof(cpu_set_t);
+    cpu_set_t m;
+    CPU_ZERO(&m);
+    sched_getaffinity(0, sizeof(cpu_set_t), &m);
+
+    for (int i = 0; i < max_cpus; i++) {
+      int c = (current_cpu + i + 1) % max_cpus;
+      if (CPU_ISSET(c, &m)) {
+        CPU_ZERO(&m);
+        CPU_SET(c, &m);
+        int ret;
+        if ((ret = pthread_attr_setaffinity_np(&attr,
+                                               sizeof(cpu_set_t), &m)))
+          DIE("pthread_attr_setaffinity_np(%d) failed: %s",
+              c, strerror(ret));
+        current_cpu = c;
+        break;
+      }
+    }
+  }
+
+  // create an epoll set
+  td->efd = epoll_create(1);
+  if (pthread_create(&td->pt, NULL, thread_main, td))
+    DIE("pthread_create() failed: %s", strerror(errno));
+}
+
 int main(int argc, char **argv) {
   if (cmdline_parser(argc, argv, &args) != 0) DIE("cmdline_parser failed");
 
@@ -78,43 +111,10 @@ int main(int argc, char **argv) {
   V("%s v%s ready to roll",
     CMDLINE_PARSER_PACKAGE_NAME, CMDLINE_PARSER_VERSION);
 
-  int efds[args.threads_arg];
-  pthread_t pt[args.threads_arg];
+  Thread td[args.threads_arg];
 
-  for (int i = 0; i < args.threads_arg; i++) {
-    int t = i;
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-
-    if (args.affinity_given) {
-      static int current_cpu = -1;
-      int max_cpus = 8 * sizeof(cpu_set_t);
-      cpu_set_t m;
-      CPU_ZERO(&m);
-      sched_getaffinity(0, sizeof(cpu_set_t), &m);
-
-      for (int i = 0; i < max_cpus; i++) {
-        int c = (current_cpu + i + 1) % max_cpus;
-        if (CPU_ISSET(c, &m)) {
-          CPU_ZERO(&m);
-          CPU_SET(c, &m);
-          int ret;
-          I("thread %d affinity %d", t, c);
-          if ((ret = pthread_attr_setaffinity_np(&attr,
-                                                 sizeof(cpu_set_t), &m)))
-            DIE("pthread_attr_setaffinity_np(%d) failed: %s",
-                c, strerror(ret));
-          current_cpu = c;
-          break;
-        }
-      }
-    }
-
-    // create an epoll set
-    uint64_t fd = efds[i] = epoll_create(1);
-    if (pthread_create(&pt[i], NULL, thread_main, (void *) fd))
-      DIE("pthread_create() failed: %s", strerror(errno));
-  }
+  for (int i = 0; i < args.threads_arg; i++)
+    spawn_thread(&td[i]);
 
   int next_thread = 0;
   int listen_socket = open_listen_socket(args.port_arg);
@@ -131,13 +131,15 @@ int main(int argc, char **argv) {
                    (void *) &optval, sizeof(optval)))
       DIE("setsockopt(TCP_NODELAY) failed: %s", strerror(errno));
 
+    Connection* conn = new Connection(newfd);
+
     struct epoll_event ev;
     ev.events = EPOLLIN;
-    ev.data.fd = newfd;
+    ev.data.ptr = conn;
 
-    if (epoll_ctl(efds[next_thread], EPOLL_CTL_ADD, newfd, &ev))
+    if (epoll_ctl(td[next_thread].efd, EPOLL_CTL_ADD, newfd, &ev))
       DIE("epoll_ctl(%d, EPOLL_CTRL_ADD, %d) failed: %s",
-          efds[next_thread], newfd, strerror(errno));
+          td[next_thread].efd, newfd, strerror(errno));
 
     next_thread = (next_thread + 1) % args.threads_arg;
   }  

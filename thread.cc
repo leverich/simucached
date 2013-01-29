@@ -11,6 +11,7 @@
 #include "simucached.h"
 #include "thread.h"
 
+#define CHUNK 4096
 #define MAX_EVENTS 4096
 
 char bleh2[] = "VALUE xyz 0 200 \r\nffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\r\nEND\r\n";
@@ -18,14 +19,8 @@ char bleh2[] = "VALUE xyz 0 200 \r\nffffffffffffffffffffffffffffffffffffffffffff
 char bleh1[] = "VALUE xyz 0 1 \r\nf\r\nEND\r\n";
 
 void* thread_main(void* args) {
-  int efd = (int) (uint64_t) args;
-
-  W("FIXME: need one buffer per thread... Duh");
-  char buffer[4096];
-  int buffer_idx = 0; // indicates location after last valid byte
-  bzero(buffer, sizeof(buffer));
-
-  D("thread checking in");
+  Thread *td = (Thread *) args;
+  int efd = td->efd;
 
   struct epoll_event events[MAX_EVENTS];
 
@@ -34,23 +29,32 @@ void* thread_main(void* args) {
     if (n < 1) DIE("epoll_wait failed: %s", strerror(errno));
 
     for (int i = 0; i < n; i++) {
-      int fd = events[i].data.fd;
+      Connection *conn = (Connection *) events[i].data.ptr;
+      int fd = conn->fd;
 
       if (events[i].events & EPOLLHUP) {
         close(fd);
+        delete conn;
         continue;
       }
 
-      int ret = read(fd, buffer + buffer_idx, sizeof(buffer) - buffer_idx - 1);
+      if (conn->buffer.size() < conn->buffer_idx + CHUNK)
+        conn->buffer.resize(conn->buffer_idx + CHUNK + 1);
+
+      int ret = read(fd, &conn->buffer[conn->buffer_idx], CHUNK);
+      //      int ret = read(fd, buffer + buffer_idx, sizeof(buffer) - buffer_idx - 1);
       if (ret <= 0) {
         close(fd);
+        delete conn;
       } else {
-        buffer_idx += ret;
+        conn->buffer_idx += ret;
+        conn->buffer[conn->buffer_idx] = '\0';
 
-        char *start = buffer;
+        char *start = &conn->buffer[0];
 
         // Locate a \r\n
-        while (start < buffer + sizeof(buffer) - 1) {
+        while (start < &conn->buffer[conn->buffer_idx]) {
+          //buffer + sizeof(buffer) - 1) {
           char *crlf = strstr(start, "\r\n");
           if (crlf == NULL) { // not found.
             break;
@@ -62,16 +66,17 @@ void* thread_main(void* args) {
           }
         }
 
-        if (start == buffer + buffer_idx) { // reset buffer_idx
-          buffer_idx = 0;
+        if (start == &conn->buffer[conn->buffer_idx]) { // reset buffer_idx
+          conn->buffer_idx = 0;
         } else {
-          int shift = buffer + buffer_idx - start;
-          // copy everything after we munched to start of buffer
-          memmove(buffer, start, shift);
-          buffer_idx = shift;
+          int shift = &conn->buffer[conn->buffer_idx] - start;
+          conn->buffer.erase(conn->buffer.begin(), conn->buffer.begin() + shift);
+          //          // copy everything after we munched to start of buffer
+          //          memmove(buffer, start, shift);
+          conn->buffer_idx = shift;
         }
 
-        buffer[buffer_idx] = '\0';
+        //        buffer[buffer_idx] = '\0';
       }
     }
   }

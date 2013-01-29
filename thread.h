@@ -1,18 +1,35 @@
+// -*- c++-mode -*-
+
 #ifndef THREAD_H
 #define THREAD_H
 
-enum thread_state_enum {
-  THREAD_IDLE, // waiting for command
-  THREAD_GOBBLE, // eating bytes after SET command
-  THREAD_LAST_STATE
-};
+#include <vector>
 
-typedef struct {
+class Thread {
+public:
   pthread_t pt; // pthread handle
   int efd; // epoll set file descriptor
-  thread_state_enum state;
+};
+
+class Connection {
+public:
+  enum connection_state_enum {
+    IDLE,
+    GOBBLE,
+    LAST_STATE
+  };
+
+  int fd;
+
+  connection_state_enum state;
   int bytes_to_eat;
-} thread_t;
+  std::vector<char> buffer;
+  //  char buffer[READ_CHUNK+1];
+  int buffer_idx;
+
+  Connection(int _fd) : fd(_fd), state(IDLE), bytes_to_eat(0), buffer_idx(0) {}
+  Connection() = delete;
+};
 
 void *thread_main(void *args);
 
