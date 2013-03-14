@@ -15,7 +15,7 @@
 #include "simucached.h"
 #include "thread.h"
 
-#define MAX_EVENTS 4096
+#define MAX_EVENTS 2048
 
 __thread char devnull[READ_CHUNK];
 
@@ -34,6 +34,8 @@ void* thread_main(void* data) {
 
   iovs[0].iov_base = (char*) "VALUE ";
   iovs[0].iov_len = strlen((char*) iovs[0].iov_base);
+  iovs[1].iov_base = (char*) "key";
+  iovs[1].iov_len = strlen((char*) iovs[1].iov_base);
 
   std::stringstream tailstream;
   tailstream << " 0 " << args.value_size_arg << "\r\n";
@@ -70,6 +72,7 @@ void* thread_main(void* data) {
       if (args.no_parse_given) {
         int ret = read(fd, conn->buffer, sizeof(conn->buffer));
         if (ret <= 0) {
+          if (ret == EAGAIN) W("read() returned EAGAIN");
           close(fd);
           delete conn;
           continue;
@@ -89,10 +92,7 @@ void* thread_main(void* data) {
 
           int length = crlf - start;
 
-          iovs[1].iov_base = (char*) "key";
-          iovs[1].iov_len = strlen((char*) iovs[1].iov_base);
-
-          writev(fd, iovs, 3);
+          if (writev(fd, iovs, 3) == EAGAIN) W("writev() returned EAGAIN");
           start += length + 2;
         }
 

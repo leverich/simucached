@@ -1,6 +1,8 @@
 #include "config.h"
 
+#include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
@@ -96,9 +98,16 @@ void spawn_thread(Thread* td) {
   }
 
   // create an epoll set
-  td->efd = epoll_create(1);
+  td->efd = epoll_create1(0);
   if (pthread_create(&td->pt, NULL, thread_main, td))
     DIE("pthread_create() failed: %s", strerror(errno));
+}
+
+static void set_nonblocking(int fd) {
+  int opts = fcntl(fd, F_GETFL);
+  if (opts < 0) DIE("fcntl(F_GETFL): %s", strerror(errno));
+  if (fcntl(fd, F_SETFL, opts | O_NONBLOCK) < 0)
+    DIE("fcntl(F_SETFL): %s", strerror(errno));
 }
 
 int main(int argc, char **argv) {
@@ -130,6 +139,8 @@ int main(int argc, char **argv) {
     if (setsockopt(newfd, IPPROTO_TCP, TCP_NODELAY,
                    (void *) &optval, sizeof(optval)))
       DIE("setsockopt(TCP_NODELAY) failed: %s", strerror(errno));
+
+    set_nonblocking(newfd);
 
     Connection* conn = new Connection(newfd);
 

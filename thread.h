@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#define READ_CHUNK 4096
+#define READ_CHUNK 16384
 
 class Thread {
 public:
