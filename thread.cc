@@ -14,6 +14,7 @@
 #include "log.h"
 #include "simucached.h"
 #include "thread.h"
+#include "work.h"
 
 #define MAX_EVENTS 2048
 
@@ -169,6 +170,7 @@ void* thread_main(void* data) {
 
               iovs[1].iov_base = key;
               iovs[1].iov_len = strlen(key);
+              work();
               writev(fd, iovs, 3);
             } else {
               W("Failed to parse GET command: %s", start);

@@ -16,3 +16,7 @@ option "affinity" T "Set distinct CPU affinity for threads, round-robin"
 option "value_size" V "Size of memcached values to return." int default="200"
 
 option "no_parse" N "Don't parse memcached protocol. Reply with GET replies."
+
+option "calibration" c "Use pre-determined value for work-loop calibration
+(see log output from --work)." int default="0"
+option "work" w "Work (in us) to do per request." int default="0"

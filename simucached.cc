@@ -17,6 +17,7 @@
 #include "log.h"
 #include "simucached.h"
 #include "thread.h"
+#include "work.h"
 
 /* simucached
 
@@ -116,6 +117,12 @@ int main(int argc, char **argv) {
   for (unsigned int i = 0; i < args.verbose_given; i++)
     log_level = (log_level_t) ((int) log_level - 1);
   if (args.quiet_given) log_level = QUIET;
+
+  if (args.work_given && !args.calibration_arg) {
+    I("Calibrating busy-work loop.");
+    args.calibration_arg = work_per_sec(10000000);
+    I("calibration = %d", args.calibration_arg);
+  }
 
   V("%s v%s ready to roll",
     CMDLINE_PARSER_PACKAGE_NAME, CMDLINE_PARSER_VERSION);

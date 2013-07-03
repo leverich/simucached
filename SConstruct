@@ -6,7 +6,7 @@ env = Environment(ENV = os.environ)
 #env.Append(CPPPATH = ['/usr/local/include', '/opt/local/include'])
 #env.Append(LIBPATH = ['/opt/local/lib'])
 
-env.Append(CCFLAGS   = '-std=c++0x -D_GNU_SOURCE')
+env.Append(CCFLAGS   = '-std=c++0x -D_GNU_SOURCE -O3 -g')
 
 conf = env.Configure(config_h = "config.h")
 conf.Define("__STDC_FORMAT_MACROS")
@@ -14,6 +14,8 @@ conf.Define("__STDC_FORMAT_MACROS")
 if not conf.CheckCXX():
     print "A compiler with C++11 support is required."
     Exit(1)
+
+conf.CheckLib("rt", "clock_gettime", language="C++")
 
 print "Checking for gengetopt...",
 if env.Execute("@which gengetopt &> /dev/null"):
@@ -38,7 +40,7 @@ env.Append(CFLAGS = ' -O3 -Wall -g')
 
 env.Command(['cmdline.cc', 'cmdline.h'], 'cmdline.ggo', 'gengetopt < $SOURCE')
 
-src = Split("""simucached.cc cmdline.cc log.cc thread.cc""")
+src = Split("""simucached.cc cmdline.cc log.cc thread.cc work.cc""")
 
 env.Program(target='simucached', source=src)
 
