@@ -7,6 +7,7 @@
 #include <netinet/tcp.h>
 #include <pthread.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -123,6 +124,8 @@ int main(int argc, char **argv) {
     args.calibration_arg = work_per_sec(10000000);
     I("calibration = %d", args.calibration_arg);
   }
+
+  signal(SIGPIPE, SIG_IGN);
 
   V("%s v%s ready to roll",
     CMDLINE_PARSER_PACKAGE_NAME, CMDLINE_PARSER_VERSION);

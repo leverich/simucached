@@ -212,8 +212,9 @@ void* thread_main(void* data) {
 
         // Reset buffer_idx if we run out of buffer space or we've
         // successfully parsed everything in the buffer.
-        if ((conn->buffer_idx >= sizeof(conn->buffer) - 1) ||
-            (&conn->buffer[conn->buffer_idx] == start)) {
+        if (((start == conn->buffer &&
+              conn->buffer_idx >= sizeof(conn->buffer) - 1)) ||
+            &conn->buffer[conn->buffer_idx] == start) {
           conn->buffer_idx = 0;
         } else {
           // If there is any data left in the buffer (i.e. an
